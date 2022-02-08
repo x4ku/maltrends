@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+import argparse
+import json
+import logging
+import os
+import tempfile
+from pathlib import Path
+
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=os.getenv('LOG_LEVEL', 'INFO'),
+    format=(
+        '[%(levelname)s] %(asctime)s '
+        '(%(funcName)s:%(lineno)s) '
+        '%(message)s'
+    )
+)
+
+parser = argparse.ArgumentParser()
+parser.add_argument('target', choices=('manga', 'anime'), nargs='?')
+
+
+def main():
+    args = parser.parse_args()
+    data_dir = Path('data')
+    if args.target in (None, 'manga'):
+        sort_manga(data_dir / 'manga.jsonl')
+    if args.target in (None, 'anime'):
+        sort_anime(data_dir / 'anime.jsonl')
+
+
+def sort_manga(path):
+    logger.info('Sorting manga ...')
+    sort_file(path)
+    logger.info('Sorted manga')
+
+
+def sort_anime(path):
+    logger.info('Sorting anime ...')
+    sort_file(path)
+    logger.info('Sorted anime')
+
+
+def sort_file(path, key=None, chunk_size=None):
+    with tempfile.TemporaryFile() as temp:
+        for line in sort_stream(path, key, chunk_size):
+            temp.write(bytes(line, 'utf-8'))
+        temp.seek(0)
+        with open(path, 'w') as file:
+            for line in temp:
+                file.write(str(line, 'utf-8'))
+
+
+def sort_plan(path, key=None):
+    key = key or (lambda r: r[0])
+    with open(path) as file:
+        keys = [(key(json.loads(l)), i) for i, l in enumerate(file)]
+    return [(b, a) for a, (_, b) in enumerate(sorted(keys))]
+
+
+def sort_stream(path, key=None, chunk_size=None):
+    chunk_size = chunk_size or 100000
+    plan = sort_plan(path, key)
+    for start in range(0, len(plan), chunk_size):
+        end = start + chunk_size
+        window = plan[start:end]
+        lines = [line for line, _ in window]
+        chunk = read_chunk(path, lines)
+        chunkmap = dict(chunk)
+        for before, after in window:
+            yield chunkmap[before]
+
+
+def read_chunk(path, lines):
+    with open(path) as file:
+        chunk = [(i, l) for i, l in enumerate(file) if i in lines]
+    return chunk
+
+
+if __name__ == '__main__':
+    main()

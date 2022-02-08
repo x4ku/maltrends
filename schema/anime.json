@@ -1,0 +1,45 @@
+{
+    "id": null,
+    "title": null,
+    "main_picture": {
+        "large": null,
+        "medium": null
+    },
+    "alternative_titles": {
+        "synonymns": null,
+        "en": null,
+        "ja": null
+    },
+    "start_date": null,
+    "end_date": null,
+    "synopsis": null,
+    "nsfw": null,
+    "genres": [
+        {
+            "id": null,
+            "name": null
+        }
+    ],
+    "created_at": null,
+    "updated_at": null,
+    "media_type": null,
+    "status": null,
+    "num_episodes": null,
+    "start_season": {
+        "year": null,
+        "season": null
+    },
+    "broadcast": {
+        "day_of_the_week": null,
+        "start_time": null
+    },
+    "source": null,
+    "average_episode_duration": null,
+    "rating": null,
+    "studios": [
+        {
+            "id": null,
+            "name": null
+        }
+    ]
+}

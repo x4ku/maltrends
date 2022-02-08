@@ -1,0 +1,296 @@
+#!/usr/bin/env python3
+import argparse
+import json
+import logging
+import os
+import requests
+import time
+from pathlib import Path
+
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=os.getenv('LOG_LEVEL', 'INFO'),
+    format=(
+        '[%(levelname)s] %(asctime)s '
+        '(%(funcName)s:%(lineno)s) '
+        '%(message)s'
+    )
+)
+
+parser = argparse.ArgumentParser()
+parser.add_argument('target', choices=('manga', 'anime'), nargs='?')
+
+MAL_API_DOMAIN = 'api.myanimelist.net'
+MAL_API_VERSION = 'v2'
+MAL_API_URL = f'https://{MAL_API_DOMAIN}/{MAL_API_VERSION}'
+MAL_API_URL_MANGA_RANKING = f'{MAL_API_URL}/manga/ranking'
+MAL_API_URL_ANIME_RANKING = f'{MAL_API_URL}/anime/ranking'
+MAL_CLIENT_ID = os.getenv('MAL_CLIENT_ID')
+
+MAX_MANGA_RANK = int(os.getenv('MAX_MANGA_RANK', 9000))
+MAX_ANIME_RANK = int(os.getenv('MAX_ANIME_RANK', 50000))
+
+MANGA_FIELDS = [
+    'id', 'title', 'main_picture', 'alternative_titles', 'start_date',
+    'end_date', 'synopsis', 'mean', 'rank', 'popularity', 'num_list_users',
+    'num_scoring_users', 'nsfw', 'genres', 'created_at', 'updated_at',
+    'media_type', 'status', 'num_volumes', 'num_chapters', 'authors'
+]
+ANIME_FIELDS = [
+    'id', 'title', 'main_picture', 'alternative_titles', 'start_date',
+    'end_date', 'synopsis', 'mean', 'rank', 'popularity', 'num_list_users',
+    'num_scoring_users', 'nsfw', 'genres', 'created_at', 'updated_at',
+    'media_type', 'status', 'num_episodes', 'start_season', 'broadcast',
+    'source', 'average_episodes_durations', 'rating', 'studios'
+]
+
+
+def main():
+    args = parser.parse_args()
+    data_dir = Path('data')
+    os.makedirs(data_dir, exist_ok=True)
+    if args.target in (None, 'manga'):
+        update_manga_ranking(
+            data_dir / 'manga.jsonl',
+            data_dir / 'manga-ranking.jsonl'
+        )
+    if args.target in (None, 'anime'):
+        update_anime_ranking(
+            data_dir / 'anime.jsonl',
+            data_dir / 'anime-ranking.jsonl'
+        )
+
+
+def update_manga_ranking(manga_path, ranking_path):
+    logger.info('Updating manga ranking ...')
+    stream = stream_manga_ranking()
+    stream = stream_writer(stream, manga_path, write_manga_record)
+    stream = stream_writer(stream, ranking_path, write_ranking_record)
+    read_stream(stream)
+    logger.info('Updated manga ranking')
+
+
+def update_anime_ranking(anime_path, ranking_path):
+    logger.info('Updating anime ranking ...')
+    stream = stream_anime_ranking()
+    stream = stream_writer(stream, anime_path, write_anime_record)
+    stream = stream_writer(stream, ranking_path, write_ranking_record)
+    read_stream(stream)
+    logger.info('Updated anime ranking')
+
+
+def stream_manga_ranking(ranking_type='all', limit=500, fields=None):
+    return mal_paginate(
+        url=MAL_API_URL_MANGA_RANKING,
+        params={
+            'ranking_type': ranking_type,
+            'limit': limit,
+            'fields': ','.join(fields or MANGA_FIELDS),
+            'nsfw': 'true'
+        },
+        max_offset=MAX_MANGA_RANK
+    )
+
+
+def stream_anime_ranking(ranking_type='all', limit=500, fields=None):
+    return mal_paginate(
+        url=MAL_API_URL_ANIME_RANKING,
+        params={
+            'ranking_type': ranking_type,
+            'limit': limit,
+            'fields': ','.join(fields or ANIME_FIELDS),
+            'nsfw': 'true'
+        },
+        max_offset=MAX_ANIME_RANK
+    )
+
+
+def mal_paginate(url, params, max_offset=50000, delay=1.0):
+    params = params or {}
+    offset = 0
+    while True:
+        params['offset'] = offset
+        response = mal_request_retry(url, params=params)
+        response_json = response.json()
+        for record in response_json.get('data'):
+            yield record
+        paging = response_json.get('paging')
+        offset += params['limit']
+        if not paging.get('next') or offset >= max_offset:
+            break
+        time.sleep(delay)
+
+
+def mal_request_retry(*args, retries=3, delay=5.0, **kwargs):
+    attempts = 0
+    while True:
+        attempts += 1
+        try:
+            response = mal_request(*args, **kwargs)
+            response.raise_for_status()
+            return response
+        except requests.exceptions.HTTPError as err:
+            if attempts > retries:
+                raise err
+            logger.error('\n'.join([
+                'MAL request failed. Retrying ...',
+                str(err),
+                err.response.text
+            ]))
+            time.sleep(delay)
+
+
+def mal_request(*args, **kwargs):
+    kwargs['headers'] = kwargs.get('headers') or {}
+    kwargs['headers']['Accept'] = 'application/json'
+    kwargs['headers']['X-MAL-CLIENT-ID'] = MAL_CLIENT_ID
+    response = requests.get(*args, **kwargs)
+    response.raise_for_status()
+    return response
+
+
+def stream_writer(stream, path, write=None):
+    write = write or write_json
+    with open(path, 'w') as file:
+        for record in stream:
+            write(record, file)
+            yield record
+
+
+def write_manga_record(record, file):
+    write_json(build_manga_record(record), file)
+
+
+def build_manga_record(record):
+    node = record.get('node')
+    main_picture = node.get('main_picture', {})
+    alternative_titles = node.get('alternative_titles', {})
+    return [
+        node.get('id'),
+        node.get('title'),
+        [
+            main_picture.get('large'),
+            main_picture.get('medium')
+        ],
+        [
+            alternative_titles.get('synonyms'),
+            alternative_titles.get('en'),
+            alternative_titles.get('ja')
+        ],
+        node.get('start_date'),
+        node.get('end_date'),
+        node.get('synopsis'),
+        node.get('nsfw'),
+        [
+            [
+                genre.get('id'),
+                genre.get('name')
+            ]
+            for genre in node.get('genres', [])
+        ],
+        node.get('created_at'),
+        node.get('updated_at'),
+        node.get('media_type'),
+        node.get('status'),
+        node.get('num_volumes'),
+        node.get('num_chapters'),
+        [
+            [
+                author.get('node', {}).get('id'),
+                author.get('node', {}).get('first_name'),
+                author.get('node', {}).get('last_name'),
+                author.get('role')
+            ]
+            for author in node.get('authors', [])
+        ]
+    ]
+
+
+def write_anime_record(record, file):
+    write_json(build_anime_record(record), file)
+
+
+def build_anime_record(record):
+    node = record.get('node')
+    main_picture = node.get('main_picture', {})
+    alternative_titles = node.get('alternative_titles', {})
+    start_season = node.get('start_season', {})
+    broadcast = node.get('broadcast', {})
+    return [
+        node.get('id'),
+        node.get('title'),
+        [
+            main_picture.get('large'),
+            main_picture.get('medium')
+        ],
+        [
+            alternative_titles.get('synonyms'),
+            alternative_titles.get('en'),
+            alternative_titles.get('ja')
+        ],
+        node.get('start_date'),
+        node.get('end_date'),
+        node.get('synopsis'),
+        node.get('nsfw'),
+        [
+            [
+                genre.get('id'),
+                genre.get('name')
+            ]
+            for genre in node.get('genres', [])
+        ],
+        node.get('created_at'),
+        node.get('updated_at'),
+        node.get('media_type'),
+        node.get('status'),
+        node.get('num_episodes'),
+        [
+            start_season.get('year'),
+            start_season.get('season')
+        ],
+        [
+            broadcast.get('day_of_the_week'),
+            broadcast.get('start_time')
+        ],
+        node.get('source'),
+        node.get('average_episode_duration'),
+        node.get('rating'),
+        [
+            [
+                studio.get('id'),
+                studio.get('name')
+            ]
+            for studio in node.get('studios', [])
+        ]
+    ]
+
+
+def write_ranking_record(record, file):
+    write_json(build_ranking_record(record), file)
+
+
+def build_ranking_record(record):
+    node = record.get('node')
+    return [
+        node.get('id'),
+        node.get('title'),
+        node.get('mean'),
+        node.get('rank'),
+        node.get('popularity'),
+        node.get('num_list_users'),
+        node.get('num_scoring_users')
+    ]
+
+
+def write_json(obj, file):
+    file.write(f'{json.dumps(obj, ensure_ascii=False)}\n')
+
+
+def read_stream(stream):
+    for record in stream:
+        pass
+
+
+if __name__ == '__main__':
+    main()

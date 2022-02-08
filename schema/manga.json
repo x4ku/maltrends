@@ -1,0 +1,37 @@
+{
+    "id": null,
+    "title": null,
+    "main_picture": {
+        "large": null,
+        "medium": null
+    },
+    "alternative_titles": {
+        "synonymns": null,
+        "en": null,
+        "ja": null
+    },
+    "start_date": null,
+    "end_date": null,
+    "synopsis": null,
+    "nsfw": null,
+    "genres": [
+        {
+            "id": null,
+            "name": null
+        }
+    ],
+    "created_at": null,
+    "updated_at": null,
+    "media_type": null,
+    "status": null,
+    "num_volumes": null,
+    "num_chapters": null,
+    "authors": [
+        {
+            "id": null,
+            "first_name": null,
+            "last_name": null,
+            "role": null
+        }
+    ]
+}

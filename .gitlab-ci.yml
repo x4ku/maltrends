@@ -1,0 +1,116 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - when: always
+
+stages:
+  - static-analysis
+  - test
+  - update
+  - publish
+
+.python:
+  image: "python:3.9"
+  before_script:
+    - python --version
+    - pip install -r requirements.txt
+
+.python_dev:
+  extends: .python
+  before_script:
+    - pip install -r requirements-dev.txt
+
+flake8:
+  extends: .python_dev
+  stage: static-analysis
+  rules:
+    - if: '$CI_PIPELINE_SOURCE != "schedule"'
+  script:
+    - flake8 bin/*
+
+test:
+  extends: .python_dev
+  stage: test
+  rules:
+    - if: '$CI_PIPELINE_SOURCE != "schedule"'
+  script:
+    - bin/test
+
+.automatic_update:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "manual"'
+
+.update:
+  extends: .python
+  stage: update
+  rules:
+    - !reference [.automatic_update, rules]
+  artifacts:
+    paths:
+      - data/
+
+update_manga:
+  extends: .update
+  script:
+    - bin/update manga
+
+update_anime:
+  extends: .update
+  script:
+    - bin/update anime
+
+sort_manga:
+  extends: .update
+  needs:
+    - job: update_manga
+      artifacts: true
+  script:
+    - bin/sort manga
+
+sort_anime:
+  extends: .update
+  needs:
+    - job: update_anime
+      artifacts: true
+  script:
+    - bin/sort anime
+
+publish:
+  stage: publish
+  rules:
+    - !reference [.automatic_update, rules]
+  before_script:
+    # set up ssh keys
+    # (public key should be added as a deploy key)
+    # (private key should be added as the `SSH_PRIVATE_KEY` CI variable)
+    - |
+      if ! command -v ssh-agent > /dev/null; then
+        apt-get update --yes
+        apt-get install --yes openssh-client git
+      fi
+    - eval $(ssh-agent -s)
+    - echo "${SSH_PRIVATE_KEY}" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan "${CI_SERVER_HOST}" >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+    # configure git username and email
+    - git config --global user.name "${GITLAB_USER_NAME}"
+    - git config --global user.email "${GITLAB_USER_EMAIL}"
+    # configure origin remote url
+    - git remote set-url origin git@${CI_SERVER_HOST}:${CI_PROJECT_PATH}
+  script:
+    - git status
+    - VERSION=$(date --utc +%Y.%m.%d)
+    - |
+      if [[ -n "$(git status --porcelain)" ]]; then
+        git checkout $CI_COMMIT_REF_NAME
+        git add --all
+        git commit --message "Update $VERSION"
+        git tag $VERSION
+        git push --push-option ci.skip origin $CI_COMMIT_REF_NAME $VERSION
+      else
+        echo "Nothing to publish!"
+      fi

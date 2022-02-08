@@ -1,0 +1,13 @@
+
+# python
+__pycache__
+.pyc
+
+# virtual environment
+env
+
+# temporary files
+data/temp.jsonl
+
+# junk
+.DS_Store
