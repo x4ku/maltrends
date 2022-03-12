@@ -6,24 +6,33 @@
 
 ## Overview
 
-This project collects manga and anime data from [MyAnimeList.net] each week.
-This data is used to track trends in popularity.
+This project collects manga and anime data from [MyAnimeList.net] for the
+purpose of tracking current and historical popularity trends. The data is
+provided in the [jsonlines] format.
 
 You can download the latest files here:
-- [`manga.jsonl`]
-- [`manga-ranking.jsonl`]
-- [`anime.jsonl`]
-- [`anime-ranking.jsonl`]
+
+| File                    | Description        |
+| ----------------------- | ------------------ |
+| [`anime.jsonl`]         | Anime title data   |
+| [`anime-ranking.jsonl`] | Anime ranking data |
+| [`manga.jsonl`]         | Manga title data   |
+| [`manga-ranking.jsonl`] | Manga ranking data |
+
+These files are automatically updated every week.
 
 The schema of these records is expressed in the following schema files:
-- [`manga.json`]
-- [`anime.json`]
-- [`ranking.json`]
+
+| File             | Description                |
+| ---------------- | -------------------------- |
+| [`anime.json`]   | Anime title schema         |
+| [`manga.json`]   | Manga title schema         |
+| [`ranking.json`] | Anime/Manga ranking schema |
 
 ## Usage
 
 You can read and work with the data files from this project as-is, line-by-line.
-Each line is a JSON array containing an entry's *values*. There is no need to
+Each line is a JSON array containing a record's *values*. There is no need to
 even load the entire file into memory if your use-case does not require it -
 simply read and work with one line at a time.
 
@@ -33,10 +42,10 @@ retaining the ability to express the complex structure of these records in JSON.
 If you would prefer to convert these records into dictionaries/objects, a
 reference implementation is provided below.
 
-### Converting Entries to Dictionaries
+### Converting Records to Dictionaries
 
 The reference implementation below uses the [`manga.json`] schema file to
-convert each record from the [`manga.jsonl`] file into a dictionary/object.
+convert records from the [`manga.jsonl`] file into dictionaries/objects.
 
 ```py
 import json
@@ -54,10 +63,10 @@ with open(Path('schema') / 'manga.json') as file:
     schema = json.load(file)
 
 with open(Path('data') / 'manga.jsonl') as file:
-    entries = [map_schema(json.loads(line), schema) for line in file]
+    records = [map_schema(json.loads(line), schema) for line in file]
 ```
 
-The `entries` variable should now contain the records as dictionaries.
+The `records` variable should now contain the records as dictionaries.
 
 ## License
 
@@ -77,3 +86,4 @@ in your own work.
 [`ranking.json`]: schema/ranking.json
 
 [MyAnimeList.net]: https://myanimelist.net
+[jsonlines]: https://jsonlines.org/
