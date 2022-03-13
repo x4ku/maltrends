@@ -28,14 +28,17 @@ MAL_API_URL_MANGA_RANKING = f'{MAL_API_URL}/manga/ranking'
 MAL_API_URL_ANIME_RANKING = f'{MAL_API_URL}/anime/ranking'
 MAL_CLIENT_ID = os.getenv('MAL_CLIENT_ID')
 
-MAX_MANGA_RANK = int(os.getenv('MAX_MANGA_RANK', 9000))
+MAX_MANGA_RANK = int(os.getenv('MAX_MANGA_RANK', 50000))
 MAX_ANIME_RANK = int(os.getenv('MAX_ANIME_RANK', 50000))
 
 MANGA_FIELDS = [
     'id', 'title', 'main_picture', 'alternative_titles', 'start_date',
-    'end_date', 'synopsis', 'mean', 'rank', 'popularity', 'num_list_users',
-    'num_scoring_users', 'nsfw', 'genres', 'created_at', 'updated_at',
-    'media_type', 'status', 'num_volumes', 'num_chapters', 'authors'
+    'end_date',
+    # (#8: requests fail past offset=9000 if the "synopsis" field is passed)
+    # 'synopsis',
+    'mean', 'rank', 'popularity', 'num_list_users', 'num_scoring_users',
+    'nsfw', 'genres', 'created_at', 'updated_at', 'media_type', 'status',
+    'num_volumes', 'num_chapters', 'authors'
 ]
 ANIME_FIELDS = [
     'id', 'title', 'main_picture', 'alternative_titles', 'start_date',
@@ -84,10 +87,11 @@ def stream_manga_ranking(ranking_type='all', limit=500, fields=None):
     return mal_paginate(
         url=MAL_API_URL_MANGA_RANKING,
         params={
-            'ranking_type': ranking_type,
             'limit': limit,
-            'fields': ','.join(fields or MANGA_FIELDS),
-            'nsfw': 'true'
+            'offset': 0,
+            'nsfw': 'true',
+            'ranking_type': ranking_type,
+            'fields': ','.join(fields or MANGA_FIELDS)
         },
         max_offset=MAX_MANGA_RANK
     )
@@ -97,10 +101,11 @@ def stream_anime_ranking(ranking_type='all', limit=500, fields=None):
     return mal_paginate(
         url=MAL_API_URL_ANIME_RANKING,
         params={
-            'ranking_type': ranking_type,
             'limit': limit,
-            'fields': ','.join(fields or ANIME_FIELDS),
-            'nsfw': 'true'
+            'offset': 0,
+            'nsfw': 'true',
+            'ranking_type': ranking_type,
+            'fields': ','.join(fields or ANIME_FIELDS)
         },
         max_offset=MAX_ANIME_RANK
     )
