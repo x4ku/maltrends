@@ -28,8 +28,8 @@ MAL_API_URL_MANGA_RANKING = f'{MAL_API_URL}/manga/ranking'
 MAL_API_URL_ANIME_RANKING = f'{MAL_API_URL}/anime/ranking'
 MAL_CLIENT_ID = os.getenv('MAL_CLIENT_ID')
 
-MAX_MANGA_RANK = int(os.getenv('MAX_MANGA_RANK', 50000))
-MAX_ANIME_RANK = int(os.getenv('MAX_ANIME_RANK', 50000))
+MAX_MANGA_OFFSET = int(os.getenv('MAX_MANGA_OFFSET', 50000))
+MAX_ANIME_OFFSET = int(os.getenv('MAX_ANIME_OFFSET', 50000))
 
 MANGA_FIELDS = [
     'id', 'title', 'main_picture', 'alternative_titles', 'start_date',
@@ -93,7 +93,7 @@ def stream_manga_ranking(ranking_type='all', limit=500, fields=None):
             'ranking_type': ranking_type,
             'fields': ','.join(fields or MANGA_FIELDS)
         },
-        max_offset=MAX_MANGA_RANK
+        max_offset=MAX_MANGA_OFFSET
     )
 
 
@@ -107,7 +107,7 @@ def stream_anime_ranking(ranking_type='all', limit=500, fields=None):
             'ranking_type': ranking_type,
             'fields': ','.join(fields or ANIME_FIELDS)
         },
-        max_offset=MAX_ANIME_RANK
+        max_offset=MAX_ANIME_OFFSET
     )
 
 
