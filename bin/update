@@ -28,17 +28,14 @@ MAL_API_URL_MANGA_RANKING = f'{MAL_API_URL}/manga/ranking'
 MAL_API_URL_ANIME_RANKING = f'{MAL_API_URL}/anime/ranking'
 MAL_CLIENT_ID = os.getenv('MAL_CLIENT_ID')
 
-MAX_MANGA_OFFSET = int(os.getenv('MAX_MANGA_OFFSET', 50000))
-MAX_ANIME_OFFSET = int(os.getenv('MAX_ANIME_OFFSET', 50000))
+MAX_MANGA_OFFSET = int(os.getenv('MAX_MANGA_OFFSET', 20000))
+MAX_ANIME_OFFSET = int(os.getenv('MAX_ANIME_OFFSET', 20000))
 
 MANGA_FIELDS = [
     'id', 'title', 'main_picture', 'alternative_titles', 'start_date',
-    'end_date',
-    # (#8: requests fail past offset=9000 if the "synopsis" field is passed)
-    # 'synopsis',
-    'mean', 'rank', 'popularity', 'num_list_users', 'num_scoring_users',
-    'nsfw', 'genres', 'created_at', 'updated_at', 'media_type', 'status',
-    'num_volumes', 'num_chapters', 'authors'
+    'end_date', 'synopsis', 'mean', 'rank', 'popularity', 'num_list_users',
+    'num_scoring_users', 'nsfw', 'genres', 'created_at', 'updated_at',
+    'media_type', 'status', 'num_volumes', 'num_chapters', 'authors'
 ]
 ANIME_FIELDS = [
     'id', 'title', 'main_picture', 'alternative_titles', 'start_date',
@@ -111,7 +108,7 @@ def stream_anime_ranking(ranking_type='all', limit=500, fields=None):
     )
 
 
-def mal_paginate(url, params, max_offset=50000, delay=1.0):
+def mal_paginate(url, params, max_offset=20000, delay=1.0):
     params = params or {}
     offset = 0
     while True:
