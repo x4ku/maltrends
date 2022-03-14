@@ -14,12 +14,13 @@ stages:
   image: "python:3.9"
   before_script:
     - python --version
-    - pip install -r requirements.txt
+    - pip install --requirement requirements.txt
 
 .python_dev:
   extends: .python
   before_script:
-    - pip install -r requirements-dev.txt
+    - !reference [.python, before_script]
+    - pip install --requirement requirements-dev.txt
 
 flake8:
   extends: .python_dev
@@ -43,13 +44,14 @@ test:
     - if: '$CI_PIPELINE_SOURCE == "manual"'
 
 .update:
-  extends: .python
+  extends:
+    - .python
+    - .automatic_update
   stage: update
-  rules:
-    - !reference [.automatic_update, rules]
   artifacts:
     paths:
       - data/
+    expire_in: 3 days
 
 update_manga:
   extends: .update
@@ -77,40 +79,67 @@ sort_anime:
   script:
     - bin/sort anime
 
-publish:
-  stage: publish
-  rules:
-    - !reference [.automatic_update, rules]
+.install_git:
   before_script:
+    # install git
+    - apt-get install --yes git
+    # configure git username and email
+    - git config --global user.name "${GITLAB_USER_NAME}"
+    - git config --global user.email "${GITLAB_USER_EMAIL}"
+    # configure origin remote url
+    - git remote set-url origin git@${CI_SERVER_HOST}:${CI_PROJECT_PATH}
+
+.install_ssh:
+  before_script:
+    # install openssh-client
+    - apt-get install --yes openssh-client
     # set up ssh keys
     # (public key should be added as a deploy key)
     # (private key should be added as the `SSH_PRIVATE_KEY` CI variable)
-    - |
-      if ! command -v ssh-agent > /dev/null; then
-        apt-get update --yes
-        apt-get install --yes openssh-client git
-      fi
     - eval $(ssh-agent -s)
     - echo "${SSH_PRIVATE_KEY}" | tr -d '\r' | ssh-add -
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
     - ssh-keyscan "${CI_SERVER_HOST}" >> ~/.ssh/known_hosts
     - chmod 644 ~/.ssh/known_hosts
-    # configure git username and email
-    - git config --global user.name "${GITLAB_USER_NAME}"
-    - git config --global user.email "${GITLAB_USER_EMAIL}"
-    # configure origin remote url
-    - git remote set-url origin git@${CI_SERVER_HOST}:${CI_PROJECT_PATH}
+
+.publish_git:
+  before_script:
+    - apt-get update --yes
+    - !reference [.install_git, before_script]
+    - !reference [.install_ssh, before_script]
   script:
-    - git status
-    - VERSION=$(date --utc +%Y.%m.%d)
+    # make sure the commit ref is checked out (not detached HEAD)
+    - git checkout $CI_COMMIT_REF_NAME
+    # commit, tag, and push
     - |
       if [[ -n "$(git status --porcelain)" ]]; then
-        git checkout $CI_COMMIT_REF_NAME
         git add --all
-        git commit --message "Update $VERSION"
+        git commit --message "$MESSAGE"
         git tag $VERSION
         git push --push-option ci.skip origin $CI_COMMIT_REF_NAME $VERSION
       else
         echo "Nothing to publish!"
       fi
+
+.install_gitlfs:
+  before_script:
+    # install git-lfs
+    - apt-get install --yes git-lfs
+    - git lfs env
+
+.publish_gitlfs:
+  extends: .publish_git
+  before_script:
+    - !reference [.publish_git, before_script]
+    - !reference [.install_gitlfs, before_script]
+
+publish:
+  extends:
+    - .publish_gitlfs
+    - .automatic_update
+  stage: publish
+  script:
+    - VERSION=$(date --utc +%Y.%m.%d)
+    - MESSAGE="Update $VERSION"
+    - !reference [.publish_gitlfs, script]
