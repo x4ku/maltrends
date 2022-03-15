@@ -111,16 +111,18 @@ sort_anime:
   script:
     # make sure the commit ref is checked out (not detached HEAD)
     - git checkout $CI_COMMIT_REF_NAME
-    # commit, tag, and push
+    # commit any updates
     - |
       if [[ -n "$(git status --porcelain)" ]]; then
         git add --all
         git commit --message "$MESSAGE"
-        git tag $VERSION
-        git push --push-option ci.skip origin $CI_COMMIT_REF_NAME $VERSION
+        git push --push-option ci.skip origin $CI_COMMIT_REF_NAME
       else
         echo "Nothing to publish!"
       fi
+    # tag the current commit
+    - git tag $VERSION
+    - git push --push-option ci.skip origin $VERSION
 
 .install_gitlfs:
   before_script:
