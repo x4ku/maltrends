@@ -152,14 +152,6 @@ def mal_request(*args, **kwargs):
     return response
 
 
-def stream_writer(stream, path, write=None):
-    write = write or write_json
-    with open(path, 'w') as file:
-        for record in stream:
-            write(record, file)
-            yield record
-
-
 def write_manga_record(record, file):
     write_json(build_manga_record(record), file)
 
@@ -283,6 +275,14 @@ def build_ranking_record(record):
         node.get('num_list_users'),
         node.get('num_scoring_users')
     ]
+
+
+def stream_writer(stream, path, write=None):
+    write = write or write_json
+    with open(path, 'w') as file:
+        for record in stream:
+            write(record, file)
+            yield record
 
 
 def write_json(obj, file):
