@@ -48,36 +48,28 @@ test:
     - .python
     - .automatic_update
   stage: update
-  artifacts:
-    paths:
-      - data/
-    expire_in: 3 days
 
 update_manga:
   extends: .update
   script:
     - bin/update manga
+    - bin/sort manga
+  artifacts:
+    paths:
+      - data/manga.jsonl
+      - data/manga-ranking.jsonl
+    expire_in: 3 days
 
 update_anime:
   extends: .update
   script:
     - bin/update anime
-
-sort_manga:
-  extends: .update
-  needs:
-    - job: update_manga
-      artifacts: true
-  script:
-    - bin/sort manga
-
-sort_anime:
-  extends: .update
-  needs:
-    - job: update_anime
-      artifacts: true
-  script:
     - bin/sort anime
+  artifacts:
+    paths:
+      - data/anime.jsonl
+      - data/anime-ranking.jsonl
+    expire_in: 3 days
 
 .install_git:
   before_script:
